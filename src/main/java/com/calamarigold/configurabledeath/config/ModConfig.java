@@ -8,6 +8,8 @@ public class ModConfig {
     public static ForgeConfigSpec.BooleanValue keepHotbarOnDeath;
     public static ForgeConfigSpec.BooleanValue keepMainhandOnDeath;
     public static ForgeConfigSpec.BooleanValue keepOffhandOnDeath;
+    public static ForgeConfigSpec.BooleanValue keepMainInventoryOnDeath;
+
 
     public static void init(ForgeConfigSpec.Builder server) {
         server.comment("Death settings");
@@ -31,5 +33,9 @@ public class ModConfig {
         keepOffhandOnDeath = server
                 .comment("Should players keep their offhand item on death?")
                 .define("death.keepOffhand", false);
+
+        keepMainInventoryOnDeath = server
+                .comment("Set to true to keep main inventory (non-equipped non-hotbar) items on death")
+                .define("death.keepMainInventoryOnDeath", false);
     }
 }

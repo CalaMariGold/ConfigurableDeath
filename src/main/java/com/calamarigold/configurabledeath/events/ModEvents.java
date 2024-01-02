@@ -23,6 +23,8 @@ public class ModEvents {
     private static final Map<UUID, ItemStack> savedMainHandItems = new HashMap<>();
     private static final Map<UUID, ItemStack> savedOffHandItems = new HashMap<>();
     private static final Map<UUID, ItemStack[]> savedHotbarItems = new HashMap<>();
+    private static final Map<UUID, ItemStack[]> savedMainInventoryItems = new HashMap<>();
+
 
 
     @SubscribeEvent
@@ -35,6 +37,7 @@ public class ModEvents {
         boolean keepHotbar = ModConfig.keepHotbarOnDeath.get();
         boolean keepMainhand = ModConfig.keepMainhandOnDeath.get();
         boolean keepOffhand = ModConfig.keepOffhandOnDeath.get();
+        boolean keepMainInventory= ModConfig.keepMainInventoryOnDeath.get();
 
 
         if (keepInventory) {
@@ -80,6 +83,18 @@ public class ModEvents {
             ItemStack offHandItem = player.getOffhandItem().copy();
             savedOffHandItems.put(playerID, offHandItem);
             player.getInventory().offhand.set(0, ItemStack.EMPTY); // Clear the offhand slot
+        }
+
+        if (keepMainInventory) {
+            // The main inventory excludes armor slots and hotbar slots
+            int inventoryStart = 9; // The start of the main inventory after the hotbar
+            int inventoryEnd = 36; // The end of the main inventory before the armor slots
+            ItemStack[] mainInventoryContents = new ItemStack[inventoryEnd - inventoryStart];
+            for (int i = inventoryStart; i < inventoryEnd; i++) {
+                mainInventoryContents[i - inventoryStart] = player.getInventory().items.get(i).copy();
+                player.getInventory().items.set(i, ItemStack.EMPTY); // Clear the slot to prevent item drop
+            }
+            savedMainInventoryItems.put(playerID, mainInventoryContents);
         }
     }
 
@@ -132,6 +147,17 @@ public class ModEvents {
                 player.setItemInHand(InteractionHand.OFF_HAND, offHand);
             } else {
                 player.setItemInHand(InteractionHand.OFF_HAND, ItemStack.EMPTY);
+            }
+        }
+
+        if (ModConfig.keepMainInventoryOnDeath.get() && savedMainInventoryItems.containsKey(playerID)) {
+            ItemStack[] mainInventoryContents = savedMainInventoryItems.remove(playerID);
+            for (int i = 0; i < mainInventoryContents.length; i++) {
+                if (mainInventoryContents[i] != null) {
+                    player.getInventory().items.set(i + 9, mainInventoryContents[i]); // Restore starting from slot 9
+                } else {
+                    player.getInventory().items.set(i + 9, ItemStack.EMPTY);
+                }
             }
         }
     }
