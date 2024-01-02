@@ -9,6 +9,8 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import net.minecraft.world.Container;
 import net.minecraft.world.entity.EquipmentSlot;
+import net.minecraft.world.InteractionHand;
+
 
 import java.util.HashMap;
 import java.util.Map;
@@ -18,14 +20,24 @@ import java.util.UUID;
 public class ModEvents {
     private static final Map<UUID, ItemStack[]> savedInventories = new HashMap<>();
     private static final Map<UUID, ItemStack[]> savedArmor = new HashMap<>();
+    private static final Map<UUID, ItemStack> savedMainHandItems = new HashMap<>();
+    private static final Map<UUID, ItemStack> savedOffHandItems = new HashMap<>();
+    private static final Map<UUID, ItemStack[]> savedHotbarItems = new HashMap<>();
+
 
     @SubscribeEvent
     public static void onPlayerDeath(LivingDeathEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
-
         UUID playerID = player.getUUID();
 
-        if (ModConfig.keepInventoryOnDeath.get()) {
+        boolean keepInventory = ModConfig.keepInventoryOnDeath.get();
+        boolean keepArmor = ModConfig.keepArmorOnDeath.get();
+        boolean keepHotbar = ModConfig.keepHotbarOnDeath.get();
+        boolean keepMainhand = ModConfig.keepMainhandOnDeath.get();
+        boolean keepOffhand = ModConfig.keepOffhandOnDeath.get();
+
+
+        if (keepInventory) {
             Container playerInventory = player.getInventory();
             ItemStack[] inventoryContents = new ItemStack[playerInventory.getContainerSize()];
             for (int i = 0; i < playerInventory.getContainerSize(); i++) {
@@ -35,7 +47,7 @@ public class ModEvents {
             savedInventories.put(playerID, inventoryContents);
         }
 
-        if (ModConfig.keepArmorOnDeath.get()) {
+        if (keepArmor) {
             ItemStack[] armorContents = new ItemStack[player.getInventory().armor.size()];
             for (int i = 0; i < player.getInventory().armor.size(); i++) {
                 armorContents[i] = player.getItemBySlot(EquipmentSlot.byTypeAndIndex(EquipmentSlot.Type.ARMOR, i)).copy();
@@ -43,11 +55,36 @@ public class ModEvents {
             }
             savedArmor.put(playerID, armorContents);
         }
+
+        if (keepHotbar) {
+            int hotbarSize = 9; // Assuming a standard hotbar size
+            ItemStack[] hotbarContents = new ItemStack[hotbarSize];
+            for (int i = 0; i < hotbarSize; i++) {
+                if (i == player.getInventory().selected && keepMainhand) {
+                    // Skip main hand slot if keepMainhand is true
+                    continue;
+                }
+                hotbarContents[i] = player.getInventory().items.get(i).copy();
+                player.getInventory().items.set(i, ItemStack.EMPTY); // Clear the slot to prevent item drop
+            }
+            savedHotbarItems.put(playerID, hotbarContents);
+        }
+
+        if (keepMainhand) {
+            ItemStack mainHandItem = player.getMainHandItem().copy();
+            savedMainHandItems.put(playerID, mainHandItem);
+            player.getInventory().setItem(player.getInventory().selected, ItemStack.EMPTY); // Clear the main hand slot
+        }
+
+        if (keepOffhand) {
+            ItemStack offHandItem = player.getOffhandItem().copy();
+            savedOffHandItems.put(playerID, offHandItem);
+            player.getInventory().offhand.set(0, ItemStack.EMPTY); // Clear the offhand slot
+        }
     }
 
     @SubscribeEvent
     public static void onPlayerRespawn(PlayerEvent.PlayerRespawnEvent event) {
-        // The 'event' parameter already provides the player directly in Forge 1.19.2.
         ServerPlayer player = (ServerPlayer) event.getEntity();
         UUID playerID = player.getUUID();
 
@@ -63,6 +100,38 @@ public class ModEvents {
             ItemStack[] armorContents = savedArmor.remove(playerID);
             for (int i = 0; i < armorContents.length; i++) {
                 player.setItemSlot(EquipmentSlot.byTypeAndIndex(EquipmentSlot.Type.ARMOR, i), armorContents[i]);
+            }
+        }
+
+        // Restore hotbar items
+        if (ModConfig.keepHotbarOnDeath.get() && savedHotbarItems.containsKey(playerID)) {
+            ItemStack[] hotbarContents = savedHotbarItems.remove(playerID);
+            for (int i = 0; i < hotbarContents.length; i++) {
+                if (hotbarContents[i] != null) {
+                    player.getInventory().items.set(i, hotbarContents[i]);
+                } else {
+                    player.getInventory().items.set(i, ItemStack.EMPTY);
+                }
+            }
+        }
+
+        // Restore mainhand item
+        if (ModConfig.keepMainhandOnDeath.get() && savedMainHandItems.containsKey(playerID)) {
+            ItemStack mainHand = savedMainHandItems.remove(playerID);
+            if (mainHand != null) {
+                player.setItemInHand(InteractionHand.MAIN_HAND, mainHand);
+            } else {
+                player.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
+            }
+        }
+
+        // Restore offhand item
+        if (ModConfig.keepOffhandOnDeath.get() && savedOffHandItems.containsKey(playerID)) {
+            ItemStack offHand = savedOffHandItems.remove(playerID);
+            if (offHand != null) {
+                player.setItemInHand(InteractionHand.OFF_HAND, offHand);
+            } else {
+                player.setItemInHand(InteractionHand.OFF_HAND, ItemStack.EMPTY);
             }
         }
     }
