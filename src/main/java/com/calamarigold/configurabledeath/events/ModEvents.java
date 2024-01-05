@@ -31,6 +31,10 @@ public class ModEvents {
     private static final Map<UUID, ItemStack[]> savedHotbarItems = new HashMap<>();
     private static final Map<UUID, ItemStack[]> savedMainInventoryItems = new HashMap<>();
 
+    private static final Map<UUID, Integer> playerHungerLevels = new HashMap<>();
+    private static final Map<UUID, Float> playerSaturationLevels = new HashMap<>();
+
+
 
     // Overloaded method for a single ItemStack
     private static void applyDurabilityLoss(ItemStack item, double durabilityLossPercentage) {
@@ -77,6 +81,11 @@ public class ModEvents {
         boolean keepMainhand = ModConfig.keepMainhandOnDeath.get();
         boolean keepOffhand = ModConfig.keepOffhandOnDeath.get();
         boolean keepMainInventory= ModConfig.keepMainInventoryOnDeath.get();
+
+        // Store the player's current hunger and saturation level
+        playerHungerLevels.put(playerID, player.getFoodData().getFoodLevel());
+        playerSaturationLevels.put(playerID, player.getFoodData().getSaturationLevel());
+
 
 
         if (keepInventory) {
@@ -156,6 +165,22 @@ public class ModEvents {
     public static void onPlayerRespawn(PlayerEvent.PlayerRespawnEvent event) {
         ServerPlayer player = (ServerPlayer) event.getEntity();
         UUID playerID = player.getUUID();
+
+        // Handle food level
+        if (ModConfig.keepFoodLevel.get() && playerHungerLevels.containsKey(playerID)) {
+            int deathHungerLevel = playerHungerLevels.get(playerID);
+            int respawnHungerLevel = Math.max(ModConfig.minFoodLevel.get(), deathHungerLevel);
+            respawnHungerLevel = Math.min(respawnHungerLevel, ModConfig.maxFoodLevel.get());
+            player.getFoodData().setFoodLevel(respawnHungerLevel);
+
+            if (ModConfig.keepSaturation.get() && playerSaturationLevels.containsKey(playerID)) {
+                player.getFoodData().setSaturation(playerSaturationLevels.get(playerID));
+                playerSaturationLevels.remove(playerID);
+            }
+            playerHungerLevels.remove(playerID);
+        }
+
+
 
         if (ModConfig.keepInventoryOnDeath.get() && savedInventories.containsKey(playerID)) {
             ItemStack[] inventoryContents = savedInventories.remove(playerID);
