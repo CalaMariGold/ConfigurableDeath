@@ -11,6 +11,8 @@ public class ModConfig {
     public static ForgeConfigSpec.BooleanValue keepMainInventoryOnDeath;
 
     public static ForgeConfigSpec.DoubleValue durabilityLossOnKeptItems;
+    public static ForgeConfigSpec.DoubleValue durabilityLossOnDrops;
+
 
 
 
@@ -43,6 +45,11 @@ public class ModConfig {
 
         durabilityLossOnKeptItems = server
                 .comment("Percent of durability lost on death for kept items")
-                .defineInRange("death.durabilityLossOnKeptItems", 0.05, 0.0, 1.0);
+                .defineInRange("death.durabilityLossOnKeptItems", 0.0, 0.0, 1.0);
+
+        durabilityLossOnDrops = server
+                .comment("Percent of durability lost on death for drops")
+                .defineInRange("death.durabilityLossOnDrops", 0.0, 0.0, 1.0);
+
     }
 }

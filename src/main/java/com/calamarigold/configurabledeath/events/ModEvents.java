@@ -2,7 +2,7 @@ package com.calamarigold.configurabledeath.events;
 
 import com.calamarigold.configurabledeath.config.ModConfig;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.util.RandomSource;
+import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
@@ -11,6 +11,10 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraft.world.Container;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.InteractionHand;
+
+import net.minecraftforge.event.entity.living.LivingDropsEvent;
+import net.minecraft.world.entity.player.Player;
+
 
 
 import java.util.HashMap;
@@ -45,6 +49,19 @@ public class ModEvents {
         if (items != null) {
             for (ItemStack item : items) {
                 applyDurabilityLoss(item, durabilityLossPercentage); // Call the single ItemStack method
+            }
+        }
+    }
+
+    @SubscribeEvent
+    public static void onLivingDrops(LivingDropsEvent event) {
+        if (!(event.getEntity() instanceof Player)) return;
+
+        double durabilityLossPercentage = ModConfig.durabilityLossOnDrops.get();
+        if (durabilityLossPercentage > 0) {
+            for (ItemEntity itemEntity : event.getDrops()) {
+                ItemStack item = itemEntity.getItem();
+                applyDurabilityLoss(item, durabilityLossPercentage);
             }
         }
     }
