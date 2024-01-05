@@ -10,6 +10,9 @@ public class ModConfig {
     public static ForgeConfigSpec.BooleanValue keepOffhandOnDeath;
     public static ForgeConfigSpec.BooleanValue keepMainInventoryOnDeath;
 
+    public static ForgeConfigSpec.DoubleValue durabilityLossOnKeptItems;
+
+
 
     public static void init(ForgeConfigSpec.Builder server) {
         server.comment("Death settings");
@@ -37,5 +40,9 @@ public class ModConfig {
         keepMainInventoryOnDeath = server
                 .comment("Set to true to keep main inventory (non-equipped non-hotbar) items on death")
                 .define("death.keepMainInventoryOnDeath", false);
+
+        durabilityLossOnKeptItems = server
+                .comment("Percent of durability lost on death for kept items")
+                .defineInRange("death.durabilityLossOnKeptItems", 0.05, 0.0, 1.0);
     }
 }

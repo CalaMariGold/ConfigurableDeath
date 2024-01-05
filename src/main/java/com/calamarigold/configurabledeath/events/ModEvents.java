@@ -2,6 +2,7 @@ package com.calamarigold.configurabledeath.events;
 
 import com.calamarigold.configurabledeath.config.ModConfig;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.RandomSource;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
@@ -14,6 +15,7 @@ import net.minecraft.world.InteractionHand;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Random;
 import java.util.UUID;
 
 @Mod.EventBusSubscriber
@@ -26,6 +28,26 @@ public class ModEvents {
     private static final Map<UUID, ItemStack[]> savedMainInventoryItems = new HashMap<>();
 
 
+    // Overloaded method for a single ItemStack
+    private static void applyDurabilityLoss(ItemStack item, double durabilityLossPercentage) {
+        if (item != null && item.isDamageableItem()) {
+            int durabilityLoss = (int) Math.ceil(item.getMaxDamage() * durabilityLossPercentage);
+            item.setDamageValue(item.getDamageValue() + durabilityLoss); // Directly set the new durability value
+
+            if (item.getDamageValue() > item.getMaxDamage()) {
+                item.shrink(1); // remove if item breaks
+            }
+        }
+    }
+
+    // Existing method for an array of ItemStacks
+    private static void applyDurabilityLoss(ItemStack[] items, double durabilityLossPercentage) {
+        if (items != null) {
+            for (ItemStack item : items) {
+                applyDurabilityLoss(item, durabilityLossPercentage); // Call the single ItemStack method
+            }
+        }
+    }
 
     @SubscribeEvent
     public static void onPlayerDeath(LivingDeathEvent event) {
@@ -95,6 +117,21 @@ public class ModEvents {
                 player.getInventory().items.set(i, ItemStack.EMPTY); // Clear the slot to prevent item drop
             }
             savedMainInventoryItems.put(playerID, mainInventoryContents);
+        }
+
+
+        // Apply durability loss to kept items if the config option is not zero
+        double durabilityLossPercentage = ModConfig.durabilityLossOnKeptItems.get();
+        if (durabilityLossPercentage > 0) {
+            applyDurabilityLoss(savedInventories.get(playerID), durabilityLossPercentage);
+            applyDurabilityLoss(savedArmor.get(playerID), durabilityLossPercentage);
+            if (savedMainHandItems.containsKey(playerID)) {
+                applyDurabilityLoss(savedMainHandItems.get(playerID), durabilityLossPercentage);
+            }
+            if (savedOffHandItems.containsKey(playerID)) {
+                applyDurabilityLoss(savedOffHandItems.get(playerID), durabilityLossPercentage);
+            }
+            applyDurabilityLoss(savedHotbarItems.get(playerID), durabilityLossPercentage);
         }
     }
 
