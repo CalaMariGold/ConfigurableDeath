@@ -67,7 +67,7 @@ public class ModConfig {
 
         server.comment("Experience settings");
         server.comment("");
-        keepAllXPOnDeath = server
+        enableExperienceModule = server
                 .comment("Enable experience settings")
                 .define("experience.enableExperienceModule", false);
         droppedXPPercent = server
