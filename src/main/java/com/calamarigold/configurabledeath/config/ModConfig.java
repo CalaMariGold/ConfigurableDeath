@@ -18,6 +18,13 @@ public class ModConfig {
     public static ForgeConfigSpec.IntValue minFoodLevel;
     public static ForgeConfigSpec.BooleanValue keepSaturation;
 
+    public static ForgeConfigSpec.BooleanValue enableExperienceModule;
+    public static ForgeConfigSpec.DoubleValue droppedXPPercent;
+    public static ForgeConfigSpec.DoubleValue recoverableXPPercent;
+
+
+
+
 
     public static void init(ForgeConfigSpec.Builder server) {
         server.comment("Inventory drop settings");
@@ -28,11 +35,11 @@ public class ModConfig {
 
         keepArmorOnDeath = server
                 .comment("Should players keep their armor on death?")
-                .define("itemDrops.keepArmor", true);
+                .define("itemDrops.keepArmor", false);
 
         keepHotbarOnDeath = server
                 .comment("Should players keep their non-mainhand hotbar items on death?")
-                .define("itemDrops.keepHotbar", true);
+                .define("itemDrops.keepHotbar", false);
 
         keepMainhandOnDeath = server
                 .comment("Should players keep their mainhand item on death?")
@@ -56,6 +63,23 @@ public class ModConfig {
         durabilityLossOnDrops = server
                 .comment("Percent of durability lost on death for drops")
                 .defineInRange("durability.durabilityLossOnDrops", 0.0, 0.0, 1.0);
+
+
+        server.comment("Experience settings");
+        server.comment("");
+        keepAllXPOnDeath = server
+                .comment("Enable experience settings")
+                .define("experience.enableExperienceModule", false);
+        droppedXPPercent = server
+                .comment("Percent of experience dropped on death")
+                .defineInRange("experience.droppedXPPercent", 0.50, 0.0, 1.0);
+
+        recoverableXPPercent = server
+                .comment("Percent of dropped experience that can be recovered")
+                .defineInRange("experience.recoverableXPPercent", 0.25, 0.0, 1.0);
+
+
+
 
         server.comment("Hunger settings");
         server.comment("");

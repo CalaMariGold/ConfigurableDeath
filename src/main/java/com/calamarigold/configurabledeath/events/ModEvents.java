@@ -2,6 +2,7 @@ package com.calamarigold.configurabledeath.events;
 
 import com.calamarigold.configurabledeath.config.ModConfig;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.ExperienceOrb;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
@@ -30,6 +31,8 @@ public class ModEvents {
     private static final Map<UUID, ItemStack> savedOffHandItems = new HashMap<>();
     private static final Map<UUID, ItemStack[]> savedHotbarItems = new HashMap<>();
     private static final Map<UUID, ItemStack[]> savedMainInventoryItems = new HashMap<>();
+
+    private static final Map<UUID, Integer> playerXPLevels = new HashMap<>();
 
     private static final Map<UUID, Integer> playerHungerLevels = new HashMap<>();
     private static final Map<UUID, Float> playerSaturationLevels = new HashMap<>();
@@ -87,6 +90,24 @@ public class ModEvents {
         playerSaturationLevels.put(playerID, player.getFoodData().getSaturationLevel());
 
 
+        // Handle XP dropping
+        if (ModConfig.enableExperienceModule.get()) {
+            player.skipDropExperience();
+
+            int currentTotalXP = player.totalExperience;
+            int xpToDrop = (int) (currentTotalXP * ModConfig.droppedXPPercent.get());
+            int xpToKeep = currentTotalXP - xpToDrop;
+            playerXPLevels.put(player.getUUID(), xpToKeep);
+            player.experienceLevel = 0;
+            player.experienceProgress = 0;
+
+
+            // Drop the recoverable portion of XP as an orb
+            int xpToDropOnGround = (int) (xpToDrop * ModConfig.recoverableXPPercent.get());
+            if (xpToDropOnGround > 0) {
+                player.level.addFreshEntity(new ExperienceOrb(player.level, player.getX(), player.getY(), player.getZ(), xpToDropOnGround));
+            }
+        }
 
         if (keepInventory) {
             Container playerInventory = player.getInventory();
@@ -180,6 +201,13 @@ public class ModEvents {
             playerHungerLevels.remove(playerID);
         }
 
+
+        // Restore XP
+        if (playerXPLevels.containsKey(playerID)) {
+            int xpToRestore = playerXPLevels.get(playerID);
+            player.giveExperiencePoints(xpToRestore);
+            playerXPLevels.remove(playerID);
+        }
 
 
         if (ModConfig.keepInventoryOnDeath.get() && savedInventories.containsKey(playerID)) {
