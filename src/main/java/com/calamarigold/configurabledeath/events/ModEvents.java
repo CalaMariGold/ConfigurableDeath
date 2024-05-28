@@ -15,7 +15,8 @@ import net.minecraft.world.InteractionHand;
 
 import net.minecraftforge.event.entity.living.LivingDropsEvent;
 import net.minecraft.world.entity.player.Player;
-
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 
 
 import java.util.HashMap;
@@ -36,6 +37,9 @@ public class ModEvents {
 
     private static final Map<UUID, Integer> playerHungerLevels = new HashMap<>();
     private static final Map<UUID, Float> playerSaturationLevels = new HashMap<>();
+
+    public static final Logger LOGGER = LogManager.getLogger("ConfigurableDeath");
+
 
 
 
@@ -83,12 +87,11 @@ public class ModEvents {
         boolean keepHotbar = ModConfig.keepHotbarOnDeath.get();
         boolean keepMainhand = ModConfig.keepMainhandOnDeath.get();
         boolean keepOffhand = ModConfig.keepOffhandOnDeath.get();
-        boolean keepMainInventory= ModConfig.keepMainInventoryOnDeath.get();
+        boolean keepMainInventory = ModConfig.keepMainInventoryOnDeath.get();
 
         // Store the player's current hunger and saturation level
         playerHungerLevels.put(playerID, player.getFoodData().getFoodLevel());
         playerSaturationLevels.put(playerID, player.getFoodData().getSaturationLevel());
-
 
         // Handle XP dropping
         if (ModConfig.enableExperienceModule.get()) {
@@ -100,7 +103,6 @@ public class ModEvents {
             playerXPLevels.put(player.getUUID(), xpToKeep);
             player.experienceLevel = 0;
             player.experienceProgress = 0;
-
 
             // Drop the recoverable portion of XP as an orb
             int xpToDropOnGround = (int) (xpToDrop * ModConfig.recoverableXPPercent.get());
@@ -132,11 +134,8 @@ public class ModEvents {
             int hotbarSize = 9; // Assuming a standard hotbar size
             ItemStack[] hotbarContents = new ItemStack[hotbarSize];
             for (int i = 0; i < hotbarSize; i++) {
-                if (i == player.getInventory().selected && keepMainhand) {
-                    // Skip main hand slot if keepMainhand is true
-                    continue;
-                }
-                hotbarContents[i] = player.getInventory().items.get(i).copy();
+                ItemStack item = player.getInventory().items.get(i);
+                hotbarContents[i] = item.copy();
                 player.getInventory().items.set(i, ItemStack.EMPTY); // Clear the slot to prevent item drop
             }
             savedHotbarItems.put(playerID, hotbarContents);
@@ -165,7 +164,6 @@ public class ModEvents {
             }
             savedMainInventoryItems.put(playerID, mainInventoryContents);
         }
-
 
         // Apply durability loss to kept items if the config option is not zero
         double durabilityLossPercentage = ModConfig.durabilityLossOnKeptItems.get();
@@ -201,14 +199,12 @@ public class ModEvents {
             playerHungerLevels.remove(playerID);
         }
 
-
         // Restore XP
         if (playerXPLevels.containsKey(playerID)) {
             int xpToRestore = playerXPLevels.get(playerID);
             player.giveExperiencePoints(xpToRestore);
             playerXPLevels.remove(playerID);
         }
-
 
         if (ModConfig.keepInventoryOnDeath.get() && savedInventories.containsKey(playerID)) {
             ItemStack[] inventoryContents = savedInventories.remove(playerID);
@@ -229,21 +225,17 @@ public class ModEvents {
         if (ModConfig.keepHotbarOnDeath.get() && savedHotbarItems.containsKey(playerID)) {
             ItemStack[] hotbarContents = savedHotbarItems.remove(playerID);
             for (int i = 0; i < hotbarContents.length; i++) {
-                if (hotbarContents[i] != null) {
-                    player.getInventory().items.set(i, hotbarContents[i]);
-                } else {
-                    player.getInventory().items.set(i, ItemStack.EMPTY);
-                }
+                player.getInventory().items.set(i, hotbarContents[i] != null ? hotbarContents[i] : ItemStack.EMPTY);
             }
         }
 
         // Restore mainhand item
         if (ModConfig.keepMainhandOnDeath.get() && savedMainHandItems.containsKey(playerID)) {
             ItemStack mainHand = savedMainHandItems.remove(playerID);
-            if (mainHand != null) {
+            if (mainHand != null && !mainHand.isEmpty()) {
                 player.setItemInHand(InteractionHand.MAIN_HAND, mainHand);
             } else {
-                player.setItemInHand(InteractionHand.MAIN_HAND, ItemStack.EMPTY);
+                // Ensure main hand item is set correctly without affecting hotbar
             }
         }
 
@@ -268,5 +260,6 @@ public class ModEvents {
             }
         }
     }
+
 
 }
