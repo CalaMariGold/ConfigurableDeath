@@ -31,27 +31,27 @@ public class ModConfig {
         
         keepInventoryOnDeath = itemDropsBuilder
                 .comment("Should players keep their inventory on death?")
-                .define("keepInventory", true);
+                .define("keepInventory", false);
 
         keepArmorOnDeath = itemDropsBuilder
                 .comment("Should players keep their armor on death?")
-                .define("keepArmor", true);
+                .define("keepArmor", false);
 
         keepHotbarOnDeath = itemDropsBuilder
                 .comment("Should players keep their non-mainhand hotbar items on death?")
-                .define("keepHotbar", true);
+                .define("keepHotbar", false);
 
         keepMainhandOnDeath = itemDropsBuilder
                 .comment("Should players keep their mainhand item on death?")
-                .define("keepMainhand", true);
+                .define("keepMainhand", false);
 
         keepOffhandOnDeath = itemDropsBuilder
                 .comment("Should players keep their offhand item on death?")
-                .define("keepOffhand", true);
+                .define("keepOffhand", false);
 
         keepMainInventoryOnDeath = itemDropsBuilder
                 .comment("Set to true to keep main inventory (non-equipped non-hotbar) items on death")
-                .define("keepMainInventoryOnDeath", true);
+                .define("keepMainInventoryOnDeath", false);
         
         itemDropsBuilder.pop(); // End itemDrops category
 
@@ -60,11 +60,11 @@ public class ModConfig {
         
         durabilityLossOnKeptItems = durabilityBuilder
                 .comment("Percent of durability lost on death for kept items")
-                .defineInRange("durabilityLossOnKeptItems", 0.5, 0.0, 1.0);
+                .defineInRange("durabilityLossOnKeptItems", 0.0, 0.0, 1.0);
 
         durabilityLossOnDrops = durabilityBuilder
                 .comment("Percent of durability lost on death for drops")
-                .defineInRange("durabilityLossOnDrops", 0.5, 0.0, 1.0);
+                .defineInRange("durabilityLossOnDrops", 0.0, 0.0, 1.0);
         
         durabilityBuilder.pop(); // End durability category
 
@@ -90,7 +90,7 @@ public class ModConfig {
         
         keepFoodLevel = hungerBuilder
                 .comment("Set to true to retain food level on death")
-                .define("keepFoodLevel", true);
+                .define("keepFoodLevel", false);
 
         maxFoodLevel = hungerBuilder
                 .comment("Highest amount of food level you can respawn with")
