@@ -1,6 +1,8 @@
 package com.calamarigold.configurabledeath.config;
 
 import net.minecraftforge.common.ForgeConfigSpec;
+import java.util.List;
+import java.util.ArrayList;
 
 public class ModConfig {
     public static ForgeConfigSpec.BooleanValue keepInventoryOnDeath;
@@ -9,6 +11,11 @@ public class ModConfig {
     public static ForgeConfigSpec.BooleanValue keepMainhandOnDeath;
     public static ForgeConfigSpec.BooleanValue keepOffhandOnDeath;
     public static ForgeConfigSpec.BooleanValue keepMainInventoryOnDeath;
+    // Unified rule-based system: Format "damageSource:part:action"
+    // damageSource: player, lava, fall, etc.
+    // part: hotbar, armor, mainhand, offhand, mainInventory, inventory (all)
+    // action: drop (force drop) or keep (force keep)
+    public static ForgeConfigSpec.ConfigValue<List<? extends String>> damageSourceRules;
 
     public static ForgeConfigSpec.DoubleValue durabilityLossOnKeptItems;
     public static ForgeConfigSpec.DoubleValue durabilityLossOnDrops;
@@ -30,7 +37,7 @@ public class ModConfig {
         ForgeConfigSpec.Builder itemDropsBuilder = server.comment("Inventory drop settings").push("itemDrops");
         
         keepInventoryOnDeath = itemDropsBuilder
-                .comment("Should players keep their inventory on death?")
+                .comment("Should players keep their entire inventory on death?")
                 .define("keepInventory", false);
 
         keepArmorOnDeath = itemDropsBuilder
@@ -52,6 +59,58 @@ public class ModConfig {
         keepMainInventoryOnDeath = itemDropsBuilder
                 .comment("Set to true to keep main inventory (non-equipped non-hotbar) items on death")
                 .define("keepMainInventoryOnDeath", false);
+
+        damageSourceRules = itemDropsBuilder
+                .comment("Specific overrides for damage source + inventory part combinations.",
+                        "Format: \"damageSource:part:action\" (colon-separated)",
+                        "",
+                        "Priority order:",
+                        "  1. Specific rules (this config) - override base config for that part",
+                        "  2. Base config (keepHotbar, keepArmor, etc.) - default behavior",
+                        "",
+                        "Available damage source types:",
+                        "  - player: Killed by another player (PvP)",
+                        "  - mob: Killed by a mob",
+                        "  - arrow: Killed by an arrow",
+                        "  - fall: Fall damage",
+                        "  - fire: Fire damage",
+                        "  - lava: Lava damage",
+                        "  - drown: Drowning",
+                        "  - explosion: Explosion damage",
+                        "  - magic: Magic damage",
+                        "  - wither: Wither effect",
+                        "  - starve: Starvation",
+                        "  - cactus: Cactus damage",
+                        "  - sweetBerryBush: Sweet berry bush damage",
+                        "  - sting: Bee sting",
+                        "  - thorns: Thorns enchantment",
+                        "  - outOfWorld: Void damage",
+                        "  - generic: Generic damage",
+                        "  - onFire: On fire",
+                        "  - inFire: In fire",
+                        "  - lightningBolt: Lightning strike",
+                        "  - hotFloor: Magma block damage",
+                        "  - inWall: Suffocation",
+                        "  - cramming: Entity cramming",
+                        "  - dryout: Dry out",
+                        "  - freeze: Freezing",
+                        "  - stalagmite: Stalagmite damage",
+                        "  - outsideBorder: Outside world border",
+                        "  - genericKill: Generic kill",
+                        "",
+                        "Parts: hotbar, armor, mainhand, offhand, mainInventory, inventory (all items)",
+                        "Actions: drop (force drop) or keep (force keep)",
+                        "",
+                        "Examples:",
+                        "  \"player:hotbar:drop\" - Hotbar drops on PvP deaths (even if keepHotbar=true)",
+                        "  \"lava:armor:keep\" - Armor always kept on lava deaths (even if keepArmor=false)",
+                        "  \"player:inventory:drop\" - Entire inventory drops on PvP deaths (whitelist behavior)",
+                        "  \"fall:inventory:keep\" - Entire inventory kept on fall damage (blacklist behavior)",
+                        "  \"fall:hotbar:keep\" - Hotbar always kept on fall damage",
+                        "",
+                        "Note: Rules are evaluated per-part, so you can mix different behaviors.",
+                        "Example: keepHotbar=true, but \"player:hotbar:drop\" means hotbar kept normally, dropped on PvP.")
+                .defineList("damageSourceRules", new ArrayList<String>(), obj -> obj instanceof String);
         
         itemDropsBuilder.pop(); // End itemDrops category
 

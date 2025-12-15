@@ -3,6 +3,7 @@ package com.calamarigold.configurabledeath.events;
 import com.calamarigold.configurabledeath.ConfigurableDeath;
 import com.calamarigold.configurabledeath.config.ModConfig;
 import com.calamarigold.configurabledeath.util.ModLogger;
+import com.calamarigold.configurabledeath.util.DamageSourceRule;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.ExperienceOrb;
@@ -20,9 +21,12 @@ import net.minecraft.world.InteractionHand;
 
 import net.minecraftforge.event.entity.living.LivingDropsEvent;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.damagesource.DamageSource;
 import net.minecraftforge.event.server.ServerStartedEvent;
 
 
+import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.UUID;
 
@@ -90,15 +94,90 @@ public class ModEvents {
         // Get the persistent data storage
         DeathInventoryData data = DeathInventoryData.get((ServerLevel) player.level);
 
-        boolean keepInventory = ModConfig.keepInventoryOnDeath.get();
-        boolean keepArmor = ModConfig.keepArmorOnDeath.get() && !keepInventory; // Only keep armor separately if not keeping entire inventory
-        boolean keepHotbar = ModConfig.keepHotbarOnDeath.get() && !keepInventory; // Only keep hotbar separately if not keeping entire inventory
-        boolean keepMainhand = ModConfig.keepMainhandOnDeath.get() && !keepInventory && !keepHotbar; // Only keep mainhand separately if not keeping inventory or hotbar
-        boolean keepOffhand = ModConfig.keepOffhandOnDeath.get() && !keepInventory; // Only keep offhand separately if not keeping entire inventory
-        boolean keepMainInventory = ModConfig.keepMainInventoryOnDeath.get() && !keepInventory; // Only keep main inventory separately if not keeping entire inventory
+        // Get damage source and its type identifier
+        DamageSource damageSource = event.getSource();
+        String damageSourceType = damageSource.getMsgId();
         
-        ModLogger.debug("Configuration: keepInventory={}, keepArmor={}, keepHotbar={}, keepMainhand={}, keepOffhand={}, keepMainInventory={}",
-                keepInventory, keepArmor, keepHotbar, keepMainhand, keepOffhand, keepMainInventory);
+        ModLogger.debug("Death damage source type: '{}'", damageSourceType);
+        
+        // Parse damage source rules
+        Map<String, Map<String, Boolean>> rules = DamageSourceRule.parseRules(ModConfig.damageSourceRules.get());
+        ModLogger.debug("Parsed rules: {}", rules);
+        
+        // Determine keep flags based on config and damage source rules
+        // Priority: specific rules > base config
+        boolean keepInventory;
+        boolean keepArmor;
+        boolean keepHotbar;
+        boolean keepMainhand;
+        boolean keepOffhand;
+        boolean keepMainInventory;
+        
+        // Start with base config values
+        keepInventory = ModConfig.keepInventoryOnDeath.get();
+        keepArmor = ModConfig.keepArmorOnDeath.get() && !keepInventory;
+        keepHotbar = ModConfig.keepHotbarOnDeath.get() && !keepInventory;
+        keepMainhand = ModConfig.keepMainhandOnDeath.get() && !keepInventory && !keepHotbar;
+        keepOffhand = ModConfig.keepOffhandOnDeath.get() && !keepInventory;
+        keepMainInventory = ModConfig.keepMainInventoryOnDeath.get() && !keepInventory;
+        
+        // Apply specific rules
+        Map<String, Boolean> sourceRules = rules.get(damageSourceType);
+        ModLogger.debug("Looking for rules for damage source '{}', found: {}", damageSourceType, sourceRules);
+        ModLogger.debug("All available rules: {}", rules.keySet());
+        if (sourceRules != null && !sourceRules.isEmpty()) {
+            // Check for "inventory" rule first (affects everything)
+            Boolean inventoryRule = sourceRules.get("inventory");
+            if (inventoryRule != null) {
+                keepInventory = !inventoryRule; // true = drop, so keep = !drop
+                keepArmor = !inventoryRule;
+                keepHotbar = !inventoryRule;
+                keepMainhand = !inventoryRule;
+                keepOffhand = !inventoryRule;
+                keepMainInventory = !inventoryRule;
+                ModLogger.debug("Rule override: inventory={} for damage source '{}'", inventoryRule ? "drop" : "keep", damageSourceType);
+            } else {
+                // Apply per-part rules (only if not keeping entire inventory)
+                if (!keepInventory) {
+                    Boolean hotbarRule = sourceRules.get("hotbar");
+                    if (hotbarRule != null) {
+                        ModLogger.debug("Found hotbar rule for '{}': shouldDrop={}, current keepHotbar={}, setting to {}", 
+                                damageSourceType, hotbarRule, keepHotbar, !hotbarRule);
+                        keepHotbar = !hotbarRule;
+                        ModLogger.debug("Rule override: hotbar={} for damage source '{}'", hotbarRule ? "drop" : "keep", damageSourceType);
+                    } else {
+                        ModLogger.debug("No hotbar rule found in sourceRules for damage source '{}'", damageSourceType);
+                    }
+                    
+                    Boolean armorRule = sourceRules.get("armor");
+                    if (armorRule != null) {
+                        keepArmor = !armorRule;
+                        ModLogger.debug("Rule override: armor={} for damage source '{}'", armorRule ? "drop" : "keep", damageSourceType);
+                    }
+                    
+                    Boolean mainhandRule = sourceRules.get("mainhand");
+                    if (mainhandRule != null) {
+                        keepMainhand = !mainhandRule;
+                        ModLogger.debug("Rule override: mainhand={} for damage source '{}'", mainhandRule ? "drop" : "keep", damageSourceType);
+                    }
+                    
+                    Boolean offhandRule = sourceRules.get("offhand");
+                    if (offhandRule != null) {
+                        keepOffhand = !offhandRule;
+                        ModLogger.debug("Rule override: offhand={} for damage source '{}'", offhandRule ? "drop" : "keep", damageSourceType);
+                    }
+                    
+                    Boolean mainInventoryRule = sourceRules.get("mainInventory");
+                    if (mainInventoryRule != null) {
+                        keepMainInventory = !mainInventoryRule;
+                        ModLogger.debug("Rule override: mainInventory={} for damage source '{}'", mainInventoryRule ? "drop" : "keep", damageSourceType);
+                    }
+                }
+            }
+        }
+        
+        ModLogger.debug("Configuration: keepInventory={}, keepArmor={}, keepHotbar={}, keepMainhand={}, keepOffhand={}, keepMainInventory={}, damageSourceType={}",
+                keepInventory, keepArmor, keepHotbar, keepMainhand, keepOffhand, keepMainInventory, damageSourceType);
 
         // Store the player's current hunger and saturation level
         data.getPlayerHungerLevels().put(playerID, player.getFoodData().getFoodLevel());
@@ -252,51 +331,55 @@ public class ModEvents {
             for (int i = 0; i < playerInventory.getContainerSize(); i++) {
                 playerInventory.setItem(i, ItemStack.EMPTY);
             }
-        }
-
-        if (keepArmor && armorContents != null) {
-            data.getSavedArmor().put(playerID, armorContents);
-            data.setDirty();
             
-            // Clear the armor slots
-            for (int i = 0; i < player.getInventory().armor.size(); i++) {
-                player.setItemSlot(EquipmentSlot.byTypeAndIndex(EquipmentSlot.Type.ARMOR, i), ItemStack.EMPTY);
+            // Don't save individual parts when keeping entire inventory (prevents duplication)
+            ModLogger.debug("Keeping entire inventory, skipping individual part saves to prevent duplication");
+        } else {
+            // Only save individual parts if not keeping entire inventory
+            if (keepArmor && armorContents != null) {
+                data.getSavedArmor().put(playerID, armorContents);
+                data.setDirty();
+                
+                // Clear the armor slots
+                for (int i = 0; i < player.getInventory().armor.size(); i++) {
+                    player.setItemSlot(EquipmentSlot.byTypeAndIndex(EquipmentSlot.Type.ARMOR, i), ItemStack.EMPTY);
+                }
             }
-        }
 
-        if (keepHotbar && hotbarContents != null) {
-            data.getSavedHotbarItems().put(playerID, hotbarContents);
-            data.setDirty();
-            
-            // Clear the hotbar slots
-            for (int i = 0; i < 9; i++) {
-                player.getInventory().items.set(i, ItemStack.EMPTY);
+            if (keepHotbar && hotbarContents != null) {
+                data.getSavedHotbarItems().put(playerID, hotbarContents);
+                data.setDirty();
+                
+                // Clear the hotbar slots
+                for (int i = 0; i < 9; i++) {
+                    player.getInventory().items.set(i, ItemStack.EMPTY);
+                }
             }
-        }
 
-        if (keepMainhand && mainHandItem != null) {
-            data.getSavedMainHandItems().put(playerID, mainHandItem);
-            data.setDirty();
-            
-            // Clear the main hand slot
-            player.getInventory().setItem(player.getInventory().selected, ItemStack.EMPTY);
-        }
+            if (keepMainhand && mainHandItem != null) {
+                data.getSavedMainHandItems().put(playerID, mainHandItem);
+                data.setDirty();
+                
+                // Clear the main hand slot
+                player.getInventory().setItem(player.getInventory().selected, ItemStack.EMPTY);
+            }
 
-        if (keepOffhand && offHandItem != null) {
-            data.getSavedOffHandItems().put(playerID, offHandItem);
-            data.setDirty();
-            
-            // Clear the offhand slot
-            player.getInventory().offhand.set(0, ItemStack.EMPTY);
-        }
+            if (keepOffhand && offHandItem != null) {
+                data.getSavedOffHandItems().put(playerID, offHandItem);
+                data.setDirty();
+                
+                // Clear the offhand slot
+                player.getInventory().offhand.set(0, ItemStack.EMPTY);
+            }
 
-        if (keepMainInventory && mainInventoryContents != null) {
-            data.getSavedMainInventoryItems().put(playerID, mainInventoryContents);
-            data.setDirty();
-            
-            // Clear the main inventory slots
-            for (int i = 9; i < 36; i++) {
-                player.getInventory().items.set(i, ItemStack.EMPTY);
+            if (keepMainInventory && mainInventoryContents != null) {
+                data.getSavedMainInventoryItems().put(playerID, mainInventoryContents);
+                data.setDirty();
+                
+                // Clear the main inventory slots
+                for (int i = 9; i < 36; i++) {
+                    player.getInventory().items.set(i, ItemStack.EMPTY);
+                }
             }
         }
         
@@ -363,7 +446,8 @@ public class ModEvents {
         }
 
         // First, check if we have a full inventory saved - if so, restore only that
-        if (ModConfig.keepInventoryOnDeath.get() && data.getSavedInventories().containsKey(playerID)) {
+        // Check if items were saved, not the base config (rules can override base config)
+        if (data.getSavedInventories().containsKey(playerID)) {
             ModLogger.debug("Restoring full inventory for player {}", player.getName().getString());
             ItemStack[] inventoryContents = data.getSavedInventories().remove(playerID);
             data.setDirty();
@@ -375,8 +459,36 @@ public class ModEvents {
                 for (int i = 0; i < Math.min(playerInventory.getContainerSize(), inventoryContents.length); i++) {
                     ItemStack item = inventoryContents[i];
                     if (item != null && !item.isEmpty()) {
-                        playerInventory.setItem(i, item);
-                        restoredItems++;
+                        ItemStack currentItem = playerInventory.getItem(i);
+                        
+                        if (currentItem.isEmpty()) {
+                            // Slot is empty, restore the item
+                            playerInventory.setItem(i, item);
+                            restoredItems++;
+                            ModLogger.debug("Restored inventory item {} in slot {} for player {}", 
+                                item.getDisplayName().getString(), i, player.getName().getString());
+                        } else if (ItemStack.isSameItemSameTags(currentItem, item) && currentItem.isStackable()) {
+                            // Same item type and stackable, try to stack
+                            int newCount = Math.min(currentItem.getCount() + item.getCount(), currentItem.getMaxStackSize());
+                            currentItem.setCount(newCount);
+                            restoredItems++;
+                            ModLogger.debug("Stacked inventory item in slot {} for player {}", 
+                                i, player.getName().getString());
+                        } else {
+                            // Different item or not stackable, try to find an empty slot
+                            int emptySlot = player.getInventory().getFreeSlot();
+                            if (emptySlot >= 0) {
+                                player.getInventory().setItem(emptySlot, item);
+                                restoredItems++;
+                                ModLogger.debug("Placed inventory item in slot {} for player {} (original slot {} was occupied)", 
+                                    emptySlot, player.getName().getString(), i);
+                            } else {
+                                // No empty slot, drop the item
+                                player.drop(item, false);
+                                ModLogger.debug("Dropped inventory item for player {} due to full inventory (slot {} was occupied)", 
+                                    player.getName().getString(), i);
+                            }
+                        }
                     }
                 }
                 
@@ -412,8 +524,8 @@ public class ModEvents {
 
         // Otherwise, restore individual components
         
-        // Restore main inventory items if enabled and available
-        if (ModConfig.keepMainInventoryOnDeath.get() && data.getSavedMainInventoryItems().containsKey(playerID)) {
+        // Restore main inventory items if available (items were saved, so restore them regardless of base config)
+        if (data.getSavedMainInventoryItems().containsKey(playerID)) {
             ItemStack[] mainInventoryContents = data.getSavedMainInventoryItems().remove(playerID);
             data.setDirty();
             
@@ -457,8 +569,8 @@ public class ModEvents {
             }
         }
         
-        // Restore armor if enabled and available
-        if (ModConfig.keepArmorOnDeath.get() && data.getSavedArmor().containsKey(playerID)) {
+        // Restore armor if available (items were saved, so restore them regardless of base config)
+        if (data.getSavedArmor().containsKey(playerID)) {
             ItemStack[] armorContents = data.getSavedArmor().remove(playerID);
             data.setDirty();
             
@@ -493,8 +605,8 @@ public class ModEvents {
             }
         }
         
-        // Restore hotbar if enabled and available
-        if (ModConfig.keepHotbarOnDeath.get() && data.getSavedHotbarItems().containsKey(playerID)) {
+        // Restore hotbar if available (items were saved, so restore them regardless of base config)
+        if (data.getSavedHotbarItems().containsKey(playerID)) {
             ItemStack[] hotbarContents = data.getSavedHotbarItems().remove(playerID);
             data.setDirty();
             
@@ -534,8 +646,8 @@ public class ModEvents {
             }
         }
         
-        // Restore offhand if enabled and available
-        if (ModConfig.keepOffhandOnDeath.get() && data.getSavedOffHandItems().containsKey(playerID)) {
+        // Restore offhand if available (items were saved, so restore them regardless of base config)
+        if (data.getSavedOffHandItems().containsKey(playerID)) {
             ItemStack offHand = data.getSavedOffHandItems().remove(playerID);
             data.setDirty();
             
@@ -572,8 +684,8 @@ public class ModEvents {
             }
         }
         
-        // Restore mainhand if enabled and available
-        if (ModConfig.keepMainhandOnDeath.get() && data.getSavedMainHandItems().containsKey(playerID)) {
+        // Restore mainhand if available (items were saved, so restore them regardless of base config)
+        if (data.getSavedMainHandItems().containsKey(playerID)) {
             ItemStack mainHand = data.getSavedMainHandItems().remove(playerID);
             data.setDirty();
             

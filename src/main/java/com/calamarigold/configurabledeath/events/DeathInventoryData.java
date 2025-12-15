@@ -251,8 +251,15 @@ public class DeathInventoryData extends SavedData {
     }
 
     // Static method to get or create the data
+    // Use overworld storage to ensure data persists across dimensions
     public static DeathInventoryData get(ServerLevel level) {
-        DimensionDataStorage storage = level.getDataStorage();
+        ServerLevel overworld = level.getServer().overworld();
+        // Fallback to current level if overworld somehow isn't available (should never happen)
+        if (overworld == null) {
+            ModLogger.warn("Overworld not available, using current dimension storage. This may cause cross-dimension issues.");
+            overworld = level;
+        }
+        DimensionDataStorage storage = overworld.getDataStorage();
         return storage.computeIfAbsent(DeathInventoryData::load, DeathInventoryData::new, DATA_NAME);
     }
 
